@@ -93,7 +93,7 @@ class VideoResponse(BaseModel):
 
 # Collection schemas
 class CollectTikTokRequest(BaseModel):
-    max_videos: int | None = 100  # Максимальное количество видео для сбора
+    max_videos: int | None = 100  
 
 
 class CollectTikTokResponse(BaseModel):
