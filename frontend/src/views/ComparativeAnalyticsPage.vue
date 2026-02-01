@@ -9,11 +9,13 @@
     <!-- Фильтры -->
     <ComparativeFilters
       :selected-platforms="selectedPlatforms"
-      :period="period"
+      :start-date="startDate"
+      :end-date="endDate"
       :include-previous="includePrevious"
       :loading="loading"
       @update:platforms="selectedPlatforms = $event"
-      @update:period="period = $event"
+      @update:startDate="startDate = $event"
+      @update:endDate="endDate = $event"
       @update:includePrevious="includePrevious = $event"
       @load="loadAnalytics"
     />
@@ -302,7 +304,22 @@ const exportingWord = ref(false)
 const exportingExcel = ref(false)
 const analyticsData = ref(null)
 const selectedPlatforms = ref(['tiktok', 'youtube', 'youtube_shorts', 'instagram'])
-const period = ref('30d')
+
+// Устанавливаем даты по умолчанию: последние 30 дней
+const getDefaultDates = () => {
+  const end = new Date()
+  const start = new Date()
+  start.setDate(start.getDate() - 30)
+  
+  return {
+    start: start.toISOString().split('T')[0],
+    end: end.toISOString().split('T')[0]
+  }
+}
+
+const defaultDates = getDefaultDates()
+const startDate = ref(defaultDates.start)
+const endDate = ref(defaultDates.end)
 const includePrevious = ref(true)
 
 const loadAnalytics = async () => {
@@ -311,13 +328,18 @@ const loadAnalytics = async () => {
     return
   }
 
+  if (!startDate.value || !endDate.value) {
+    ElMessage.warning('Укажите даты начала и окончания периода')
+    return
+  }
+
   loading.value = true
   try {
     const data = await api.getComparativeAnalytics(
       selectedPlatforms.value,
-      period.value,
-      null,
-      null,
+      null, // period больше не используется
+      startDate.value,
+      endDate.value,
       includePrevious.value
     )
     analyticsData.value = data
@@ -335,7 +357,8 @@ const downloadWordReport = async () => {
   try {
     const params = new URLSearchParams()
     selectedPlatforms.value.forEach(p => params.append('platforms', p))
-    params.append('period', period.value)
+    if (startDate.value) params.append('start_date', startDate.value)
+    if (endDate.value) params.append('end_date', endDate.value)
     params.append('include_previous', includePrevious.value)
     
     const response = await fetch(`${api.baseURL}/reports/word?${params}`)
@@ -368,7 +391,8 @@ const downloadExcelReport = async () => {
   try {
     const params = new URLSearchParams()
     selectedPlatforms.value.forEach(p => params.append('platforms', p))
-    params.append('period', period.value)
+    if (startDate.value) params.append('start_date', startDate.value)
+    if (endDate.value) params.append('end_date', endDate.value)
     params.append('include_previous', includePrevious.value)
     
     const response = await fetch(`${api.baseURL}/reports/excel?${params}`)

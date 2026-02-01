@@ -57,6 +57,7 @@ class TikTokService:
         Returns:
             Статистика сбора
         """
+        print(end_date)
         # Устанавливаем дефолтные даты если не указаны
         if end_date is None:
             end_date = datetime.now()

@@ -3,6 +3,8 @@
 """
 
 import httpx
+import aiofiles
+from pathlib import Path
 from datetime import datetime
 from typing import Optional
 from models import SocialAccount, ProfileSnapshot, Video
@@ -10,6 +12,7 @@ from config import settings
 
 TGSTAT_API_TOKEN = settings.tgstat_api_token
 TGSTAT_BASE_URL = "https://api.tgstat.ru"
+MEDIA_ROOT = Path("/app/media")
 
 
 async def collect_telegram_channel_data(
@@ -97,6 +100,36 @@ async def collect_telegram_channel_data(
         "profile_updated": profile_updated,
         "channel_stats": channel_stats,
     }
+
+
+async def _download_file(url: str, save_path: Path, retries: int = 3) -> bool:
+    """Скачать файл по URL и сохранить локально"""
+    # Создаем директорию если не существует
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+
+    for attempt in range(retries):
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(url, follow_redirects=True)
+                response.raise_for_status()
+
+                async with aiofiles.open(save_path, "wb") as f:
+                    await f.write(response.content)
+
+                return True
+        except (
+            httpx.TimeoutException,
+            httpx.ConnectError,
+            httpx.RemoteProtocolError,
+        ) as e:
+            print(f"Попытка {attempt + 1}/{retries} - Ошибка скачивания {url}: {e}")
+            if attempt == retries - 1:
+                return False
+        except Exception as e:
+            print(f"Ошибка скачивания {url}: {e}")
+            return False
+
+    return False
 
 
 async def _get_channel_stats(client: httpx.AsyncClient, channel_id: str) -> dict:
@@ -220,6 +253,31 @@ async def _save_channel_snapshot(
     social_account: SocialAccount, channel_stats: dict
 ) -> ProfileSnapshot:
     """Сохранить снимок профиля канала"""
+
+    # Скачиваем аватар канала
+    avatar_url = None
+    avatar_remote_url = channel_stats.get("image640", "")
+    if avatar_remote_url:
+        print(f"[Telegram] Найден аватар канала: {avatar_remote_url}")
+
+        # Нормализуем URL
+        if not avatar_remote_url.startswith("http"):
+            avatar_remote_url = f"https:{avatar_remote_url}"
+
+        # Сохраняем аватар локально
+        channel_id = social_account.platform_user_id
+        avatar_dir = MEDIA_ROOT / "telegram" / channel_id / "avatars"
+        timestamp = int(datetime.now().timestamp())
+        avatar_filename = f"{timestamp}.jpg"
+        avatar_path = avatar_dir / avatar_filename
+
+        print(f"[Telegram] Скачивание аватара в {avatar_path}...")
+        if await _download_file(avatar_remote_url, avatar_path):
+            avatar_url = f"/media/telegram/{channel_id}/avatars/{avatar_filename}"
+            print(f"[Telegram] ✅ Аватар сохранён: {avatar_url}")
+        else:
+            print("[Telegram] ❌ Ошибка скачивания аватара")
+
     snapshot = await ProfileSnapshot.create(
         social_account=social_account,
         snapshot_date=datetime.now(),
@@ -227,7 +285,7 @@ async def _save_channel_snapshot(
         following_count=0,  # Telegram не показывает подписки
         total_likes=0,  # В Telegram нет лайков, есть реакции
         total_posts=channel_stats.get("posts_count", 0),
-        avatar_url=channel_stats.get("image640", "").replace("//", "https://"),
+        avatar_url=avatar_url,
         extra_data={
             "title": channel_stats.get("title"),
             "username": channel_stats.get("username"),
@@ -278,6 +336,34 @@ async def _save_telegram_post(social_account: SocialAccount, post_data: dict) ->
     media = post_data.get("media", {})
     media_type = media.get("media_type") if media else None
 
+    # Скачиваем обложку/фото поста если есть медиа
+    cover_url = None
+    thumbnail_url = None
+
+    if media:
+        # Получаем URL изображения из медиа (file_url или file_thumbnail_url)
+        image_url = media.get("file_url") or media.get("file_thumbnail_url")
+        if image_url:
+            print(f"[Telegram] Найдено изображение для поста {post_id}: {image_url}")
+
+            # Нормализуем URL
+            if not image_url.startswith("http"):
+                image_url = f"https:{image_url}"
+
+            # Сохраняем изображение локально
+            channel_id = social_account.platform_user_id
+            media_dir = MEDIA_ROOT / "telegram" / channel_id / "posts"
+            media_filename = f"{post_id}.jpg"
+            media_path = media_dir / media_filename
+
+            print(f"[Telegram] Скачивание изображения поста в {media_path}...")
+            if await _download_file(image_url, media_path):
+                cover_url = f"/media/telegram/{channel_id}/posts/{media_filename}"
+                thumbnail_url = cover_url  # Используем то же изображение для thumbnail
+                print(f"[Telegram] ✅ Изображение поста сохранено: {cover_url}")
+            else:
+                print("[Telegram] ❌ Ошибка скачивания изображения поста")
+
     # Проверяем существование поста
     existing_post = await Video.filter(
         social_account=social_account, platform_video_id=post_id
@@ -293,8 +379,8 @@ async def _save_telegram_post(social_account: SocialAccount, post_data: dict) ->
         "created_at_platform": created_at_platform,
         "video_url": None,  # Telegram API не предоставляет прямые ссылки на медиа
         "share_url": post_url,
-        "cover_url": None,
-        "thumbnail_url": None,
+        "cover_url": cover_url,
+        "thumbnail_url": thumbnail_url,
         "duration_ms": None,
         "views_count": detailed_stats.get("viewsCount", post_data.get("views", 0)),
         "likes_count": detailed_stats.get("reactionsCount", 0),  # В Telegram - реакции

@@ -227,14 +227,15 @@ def _calculate_comparison_metrics(current: dict, previous: dict) -> dict:
 @router.get("/comparative/platforms")
 async def get_comparative_analytics(
     platforms: List[str] = Query(default=None),
-    period: str = Query(
-        default="30d", description="Период: 7d, 30d, 90d, 365d, custom, previous"
+    start_date: Optional[str] = Query(
+        default=None, description="Дата начала периода (ISO: YYYY-MM-DD)"
     ),
-    custom_start: Optional[str] = Query(
-        default=None, description="Начало custom периода (ISO)"
+    end_date: Optional[str] = Query(
+        default=None, description="Дата окончания периода (ISO: YYYY-MM-DD)"
     ),
-    custom_end: Optional[str] = Query(
-        default=None, description="Конец custom периода (ISO)"
+    period: Optional[str] = Query(
+        default="30d",
+        description="Период: 7d, 30d, 90d, 365d (используется если не указаны start_date/end_date)",
     ),
     include_previous: bool = Query(
         default=True,
@@ -260,11 +261,12 @@ async def get_comparative_analytics(
         )
 
     try:
+        period = period if not start_date else None
         result = await calculate_comparative_analytics(
             platforms=platforms,
             period=period,
-            custom_start=custom_start,
-            custom_end=custom_end,
+            custom_start=start_date,
+            custom_end=end_date,
             include_previous=include_previous,
         )
         return result

@@ -3,6 +3,8 @@
 """
 
 import httpx
+import aiofiles
+from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional
 from models import SocialAccount, ProfileSnapshot, Video
@@ -10,6 +12,37 @@ from config import settings
 
 SCRAPECREATORS_API_KEY = settings.scrapecreators_api_key
 SCRAPECREATORS_BASE_URL = "https://api.scrapecreators.com"
+MEDIA_ROOT = Path("/app/media")
+
+
+async def _download_file(url: str, save_path: Path, retries: int = 3) -> bool:
+    """Скачать файл по URL и сохранить локально"""
+    # Создаем директорию если не существует
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+
+    for attempt in range(retries):
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(url, follow_redirects=True)
+                response.raise_for_status()
+
+                async with aiofiles.open(save_path, "wb") as f:
+                    await f.write(response.content)
+
+                return True
+        except (
+            httpx.TimeoutException,
+            httpx.ConnectError,
+            httpx.RemoteProtocolError,
+        ) as e:
+            print(f"Попытка {attempt + 1}/{retries} - Ошибка скачивания {url}: {e}")
+            if attempt == retries - 1:
+                return False
+        except Exception as e:
+            print(f"Ошибка скачивания {url}: {e}")
+            return False
+
+    return False
 
 
 async def collect_instagram_profile_data(
@@ -135,8 +168,22 @@ async def _save_profile_snapshot(
     """Сохранить снимок профиля"""
     user_data = profile_data.get("data", {}).get("user", {})
 
-    # Получаем URL аватара (HD версия если есть)
-    avatar_url = user_data.get("profile_pic_url_hd") or user_data.get("profile_pic_url")
+    # Получаем URL аватара (HD версия если есть) и скачиваем
+    avatar_url = None
+    avatar_remote_url = user_data.get("profile_pic_url_hd") or user_data.get(
+        "profile_pic_url"
+    )
+
+    if avatar_remote_url:
+        # Сохраняем аватар локально
+        user_id = social_account.platform_user_id
+        avatar_dir = MEDIA_ROOT / "instagram" / user_id / "avatars"
+        timestamp = int(datetime.now().timestamp())
+        avatar_filename = f"{timestamp}.jpg"
+        avatar_path = avatar_dir / avatar_filename
+
+        if await _download_file(avatar_remote_url, avatar_path):
+            avatar_url = f"/media/instagram/{user_id}/avatars/{avatar_filename}"
 
     # Получаем количество подписчиков и подписок
     followers_count = user_data.get("edge_followed_by", {}).get("count", 0)
@@ -189,12 +236,27 @@ async def _save_instagram_post(social_account: SocialAccount, post_data: dict) -
     caption_data = post_data.get("caption", {})
     description = caption_data.get("text") if caption_data else None
 
-    # Получаем обложку/изображение
-    cover_url = post_data.get("display_uri")
+    # Скачиваем обложку/изображение поста
+    cover_url = None
     thumbnail_url = None
-    if post_data.get("image_versions2", {}).get("candidates"):
+
+    # Пробуем получить URL изображения из разных источников
+    cover_remote_url = post_data.get("display_uri")
+    if not cover_remote_url and post_data.get("image_versions2", {}).get("candidates"):
         candidates = post_data["image_versions2"]["candidates"]
-        thumbnail_url = candidates[0].get("url") if candidates else None
+        if candidates:
+            cover_remote_url = candidates[0].get("url")
+
+    if cover_remote_url:
+        # Сохраняем изображение локально
+        user_id = social_account.platform_user_id
+        posts_dir = MEDIA_ROOT / "instagram" / user_id / "posts"
+        post_filename = f"{post_id}.jpg"
+        post_path = posts_dir / post_filename
+
+        if await _download_file(cover_remote_url, post_path):
+            cover_url = f"/media/instagram/{user_id}/posts/{post_filename}"
+            thumbnail_url = cover_url  # Используем то же изображение для thumbnail
 
     # Получаем видео URL если это видео
     video_url = None

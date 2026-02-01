@@ -23,20 +23,32 @@
           </el-select>
         </div>
 
-        <!-- Период -->
+        <!-- Дата начала -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Период</label>
-          <el-select 
-            :model-value="period" 
-            @update:model-value="$emit('update:period', $event)"
-            placeholder="Выберите период" 
+          <label class="block text-sm font-medium text-gray-700 mb-2">Дата начала</label>
+          <el-date-picker
+            :model-value="startDate"
+            @update:model-value="$emit('update:startDate', $event)"
+            type="date"
+            placeholder="Выберите дату начала"
             class="w-full"
-          >
-            <el-option label="7 дней" value="7d" />
-            <el-option label="30 дней" value="30d" />
-            <el-option label="90 дней" value="90d" />
-            <el-option label="365 дней" value="365d" />
-          </el-select>
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+          />
+        </div>
+
+        <!-- Дата окончания -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Дата окончания</label>
+          <el-date-picker
+            :model-value="endDate"
+            @update:model-value="$emit('update:endDate', $event)"
+            type="date"
+            placeholder="Выберите дату окончания"
+            class="w-full"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+          />
         </div>
 
         <!-- Предыдущий период -->
@@ -74,9 +86,13 @@ defineProps({
     type: Array,
     required: true
   },
-  period: {
+  startDate: {
     type: String,
-    required: true
+    default: null
+  },
+  endDate: {
+    type: String,
+    default: null
   },
   includePrevious: {
     type: Boolean,
@@ -88,7 +104,7 @@ defineProps({
   }
 })
 
-defineEmits(['update:platforms', 'update:period', 'update:includePrevious', 'load'])
+defineEmits(['update:platforms', 'update:startDate', 'update:endDate', 'update:includePrevious', 'load'])
 
 const availablePlatforms = [
   { label: 'TikTok', value: 'tiktok' },

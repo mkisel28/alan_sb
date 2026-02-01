@@ -126,7 +126,7 @@ export default {
     return response.data
   },
 
-  async getComparativeAnalytics(platforms, period = '30d', customStart = null, customEnd = null, includePrevious = true) {
+  async getComparativeAnalytics(platforms, period = null, startDate = null, endDate = null, includePrevious = true) {
     // Создаем URLSearchParams для правильной сериализации массива
     const params = new URLSearchParams()
     
@@ -135,11 +135,15 @@ export default {
       params.append('platforms', platform)
     })
     
-    params.append('period', period)
-    params.append('include_previous', includePrevious)
+    // Если указаны даты - используем их, иначе - period
+    if (startDate && endDate) {
+      params.append('start_date', startDate)
+      params.append('end_date', endDate)
+    } else if (period) {
+      params.append('period', period)
+    }
     
-    if (customStart) params.append('custom_start', customStart)
-    if (customEnd) params.append('custom_end', customEnd)
+    params.append('include_previous', includePrevious)
     
     const response = await apiClient.get('/analytics/comparative/platforms', { params })
     return response.data

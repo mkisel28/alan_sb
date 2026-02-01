@@ -34,19 +34,28 @@ def calculate_percentile(values: List[float], value: float) -> float:
 
 
 def get_period_dates(
-    period: str, custom_start: Optional[str] = None, custom_end: Optional[str] = None
+    period: Optional[str] = None,
+    custom_start: Optional[str] = None,
+    custom_end: Optional[str] = None,
 ) -> Tuple[datetime, datetime]:
     """
     Возвращает даты начала и конца периода
 
     Args:
-        period: '7d', '30d', '90d', '365d', 'custom', 'previous'
-        custom_start: Начальная дата для custom периода
-        custom_end: Конечная дата для custom периода
+        period: '7d', '30d', '90d', '365d', 'previous' или None (если используются custom даты)
+        custom_start: Начальная дата для custom периода (ISO: YYYY-MM-DD)
+        custom_end: Конечная дата для custom периода (ISO: YYYY-MM-DD)
 
     Returns:
         Tuple (start_date, end_date)
     """
+    # Если переданы custom даты - используем их в первую очередь
+    if custom_start and custom_end:
+        start_date = datetime.fromisoformat(custom_start.replace("Z", "+00:00"))
+        end_date = datetime.fromisoformat(custom_end.replace("Z", "+00:00"))
+        return start_date, end_date
+
+    # Иначе используем period
     end_date = datetime.now()
 
     if period == "7d":
@@ -57,15 +66,13 @@ def get_period_dates(
         start_date = end_date - timedelta(days=90)
     elif period == "365d":
         start_date = end_date - timedelta(days=365)
-    elif period == "custom" and custom_start and custom_end:
-        start_date = datetime.fromisoformat(custom_start.replace("Z", "+00:00"))
-        end_date = datetime.fromisoformat(custom_end.replace("Z", "+00:00"))
     elif period == "previous":
         # Предыдущий период той же длины
         # По умолчанию берем предыдущие 30 дней
         end_date = datetime.now() - timedelta(days=30)
         start_date = end_date - timedelta(days=30)
     else:
+        # По умолчанию 30 дней
         start_date = end_date - timedelta(days=30)
 
     return start_date, end_date
@@ -195,7 +202,7 @@ async def calculate_author_metrics(
 
 async def calculate_comparative_analytics(
     platforms: List[str],
-    period: str = "30d",
+    period: str | None = "30d",
     custom_start: Optional[str] = None,
     custom_end: Optional[str] = None,
     include_previous: bool = True,

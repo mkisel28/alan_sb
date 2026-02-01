@@ -186,15 +186,17 @@
       </div>
     </div>
 
-    <!-- Video Player Dialog -->
+    <!-- Video/Image Player Dialog -->
     <el-dialog
       v-model="videoDialogVisible"
-      title="Воспроизведение видео"
+      :title="currentVideo?.video_url ? 'Воспроизведение видео' : 'Просмотр изображения'"
       width="90%"
       :close-on-click-modal="true"
     >
       <div v-if="currentVideo" class="aspect-[9/16] max-h-[80vh] mx-auto bg-black">
+        <!-- Показываем видео если есть video_url -->
         <video
+          v-if="currentVideo.video_url"
           :src="currentVideo.video_url"
           controls
           autoplay
@@ -203,6 +205,15 @@
         >
           Ваш браузер не поддерживает воспроизведение видео.
         </video>
+        
+        <!-- Показываем изображение если нет video_url -->
+        <img
+          v-else-if="currentVideo.cover_url"
+          :src="getProxiedImageUrl(currentVideo.cover_url)"
+          :alt="currentVideo.description"
+          class="w-full h-full object-contain"
+          @error="handleImageError"
+        />
       </div>
       <template #footer>
         <div class="text-sm text-gray-600">
@@ -213,7 +224,7 @@
             target="_blank"
             class="text-blue-600 hover:underline"
           >
-            Открыть в TikTok
+            Открыть в {{ socialAccount?.platform === 'tiktok' ? 'TikTok' : socialAccount?.platform === 'instagram' ? 'Instagram' : 'Telegram' }}
           </a>
         </div>
       </template>
@@ -299,8 +310,9 @@ const handleImageError = (e) => {
 }
 
 const playVideo = (video) => {
-  if (!video.video_url) {
-    ElMessage.warning('URL видео недоступен')
+  // Если нет видео, но есть обложка/фото - показываем фото в диалоге
+  if (!video.video_url && !video.cover_url) {
+    ElMessage.warning('Медиа файл недоступен')
     return
   }
   currentVideo.value = video

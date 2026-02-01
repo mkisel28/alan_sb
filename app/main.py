@@ -31,6 +31,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Подключаем роутеры
 app.include_router(authors_router)
 app.include_router(social_accounts_router)
