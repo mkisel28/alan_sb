@@ -58,6 +58,11 @@
           <el-icon><DataAnalysis /></el-icon>
           Сравнительная аналитика
         </el-button>
+
+        <el-button type="info" size="large" @click="$router.push('/telegram-analytics')">
+          <el-icon><DataAnalysis /></el-icon>
+          Telegram аналитика
+        </el-button>
       </div>
     </el-card>
 
@@ -125,14 +130,28 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="Макс. видео">
-          <el-input-number 
-            v-model="collectForm.maxVideos" 
-            :min="10" 
-            :max="500"
+        <el-form-item label="Начальная дата">
+          <el-date-picker
+            v-model="collectForm.startDate"
+            type="date"
+            placeholder="Выберите дату"
+            format="DD.MM.YYYY"
+            value-format="YYYY-MM-DD"
             style="width: 100%"
           />
-          <div class="form-hint">Количество видео для сбора с каждого аккаунта</div>
+          <div class="form-hint">Собрать записи начиная с этой даты</div>
+        </el-form-item>
+
+        <el-form-item label="Конечная дата">
+          <el-date-picker
+            v-model="collectForm.endDate"
+            type="date"
+            placeholder="Выберите дату"
+            format="DD.MM.YYYY"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+          <div class="form-hint">Собрать записи до этой даты</div>
         </el-form-item>
 
         <el-alert
@@ -188,7 +207,8 @@ const collecting = ref(false)
 const collectForm = ref({
   mode: 'all',
   selectedAuthors: [],
-  maxVideos: 100
+  startDate: null,
+  endDate: null
 })
 
 const accountsCounts = ref({})
@@ -292,9 +312,13 @@ const handleMassCollect = async () => {
     try {
       // Выбираем правильный endpoint в зависимости от платформы
       if (account.platform === 'tiktok') {
-        await api.collectTikTokData(account.id, collectForm.value.maxVideos)
+        await api.collectTikTokData(account.id, collectForm.value.startDate, collectForm.value.endDate)
       } else if (account.platform === 'youtube' || account.platform === 'youtube_shorts') {
-        await api.collectYouTubeData(account.id, collectForm.value.maxVideos)
+        await api.collectYouTubeData(account.id, collectForm.value.startDate, collectForm.value.endDate)
+      } else if (account.platform === 'instagram') {
+        await api.collectInstagramData(account.id, collectForm.value.startDate, collectForm.value.endDate)
+      } else if (account.platform === 'telegram') {
+        await api.collectTelegramData(account.id, collectForm.value.startDate, collectForm.value.endDate)
       } else {
         throw new Error(`Платформа ${account.platform} пока не поддерживается`)
       }

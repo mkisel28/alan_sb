@@ -25,6 +25,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-analytics}
       SCRAPECREATORS_API_KEY: ${SCRAPECREATORS_API_KEY}
       SCRAPECREATORS_API_URL: ${SCRAPECREATORS_API_URL:-https://api.scrapecreators.com}
+      TGSTAT_API_TOKEN: ${TGSTAT_API_TOKEN}
     ports:
       - "${APP_PORT:-8000}:8000"
     depends_on:

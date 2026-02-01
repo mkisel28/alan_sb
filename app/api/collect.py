@@ -3,25 +3,27 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query
 from models import SocialAccount, Video
 from schemas import (
-    CollectTikTokRequest,
-    CollectTikTokResponse,
+    CollectDataRequest,
+    CollectDataResponse,
     VideoResponse,
     ProfileSnapshotResponse,
 )
 from services.tiktok_service import TikTokService
 from services.youtube_service import collect_youtube_channel_data
+from services.instagram_service import collect_instagram_profile_data
+from services.telegram_service import collect_telegram_channel_data
 
 router = APIRouter(prefix="/api/collect", tags=["collect"])
 
 
-@router.post("/tiktok/{social_account_id}", response_model=CollectTikTokResponse)
+@router.post("/tiktok/{social_account_id}", response_model=CollectDataResponse)
 async def collect_tiktok_data(
-    social_account_id: int, request: CollectTikTokRequest = CollectTikTokRequest()
+    social_account_id: int, request: CollectDataRequest = CollectDataRequest()
 ):
     """
-    Собрать данные TikTok профиля
+    Собрать данные TikTok профиля за указанный период
 
-    - Получает последние видео через ScrapeCreators API
+    - Получает видео через ScrapeCreators API
     - Сохраняет снимок профиля
     - Сохраняет видео и их метрики
     """
@@ -40,13 +42,15 @@ async def collect_tiktok_data(
     try:
         tiktok_service = TikTokService()
         result = await tiktok_service.collect_videos(
-            social_account=social_account, max_videos=request.max_videos
+            social_account=social_account,
+            start_date=request.start_date,
+            end_date=request.end_date,
         )
 
-        return CollectTikTokResponse(
+        return CollectDataResponse(
             success=True,
-            message=f"Successfully collected {result['videos_collected']} videos",
-            videos_collected=result["videos_collected"],
+            message=result["message"],
+            posts_collected=result["posts_collected"],
             profile_updated=result["profile_updated"],
             credits_remaining=result.get("credits_remaining"),
         )
@@ -54,12 +58,12 @@ async def collect_tiktok_data(
         raise HTTPException(status_code=500, detail=f"Error collecting data: {str(e)}")
 
 
-@router.post("/youtube/{social_account_id}", response_model=CollectTikTokResponse)
+@router.post("/youtube/{social_account_id}", response_model=CollectDataResponse)
 async def collect_youtube_data(
-    social_account_id: int, request: CollectTikTokRequest = CollectTikTokRequest()
+    social_account_id: int, request: CollectDataRequest = CollectDataRequest()
 ):
     """
-    Собрать данные YouTube канала (обычные видео или Shorts)
+    Собрать данные YouTube канала (обычные видео или Shorts) за указанный период
 
     - Получает информацию о канале
     - Получает видео или Shorts в зависимости от типа платформы
@@ -81,15 +85,104 @@ async def collect_youtube_data(
     # Собираем данные
     try:
         result = await collect_youtube_channel_data(
-            social_account=social_account, max_videos=request.max_videos
+            social_account=social_account,
+            start_date=request.start_date,
+            end_date=request.end_date,
         )
 
-        return CollectTikTokResponse(
+        return CollectDataResponse(
             success=True,
             message=result["message"],
-            videos_collected=result["videos_collected"],
+            posts_collected=result["posts_collected"],
             profile_updated=result["profile_updated"],
             credits_remaining=result.get("credits_remaining"),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error collecting data: {str(e)}")
+
+
+@router.post("/instagram/{social_account_id}", response_model=CollectDataResponse)
+async def collect_instagram_data(
+    social_account_id: int, request: CollectDataRequest = CollectDataRequest()
+):
+    """
+    Собрать данные Instagram профиля за указанный период
+
+    - Получает информацию о профиле
+    - Получает посты (фото и видео)
+    - Сохраняет снимок профиля
+    - Сохраняет посты и их метрики
+    """
+    # Проверяем существование аккаунта
+    social_account = await SocialAccount.filter(id=social_account_id).first()
+    if not social_account:
+        raise HTTPException(status_code=404, detail="Social account not found")
+
+    # Проверяем платформу
+    if social_account.platform != "instagram":
+        raise HTTPException(
+            status_code=400,
+            detail="This endpoint only supports Instagram accounts",
+        )
+
+    # Собираем данные
+    try:
+        result = await collect_instagram_profile_data(
+            social_account=social_account,
+            start_date=request.start_date,
+            end_date=request.end_date,
+        )
+
+        return CollectDataResponse(
+            success=True,
+            message=result["message"],
+            posts_collected=result["posts_collected"],
+            profile_updated=result["profile_updated"],
+            credits_remaining=result.get("credits_remaining"),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error collecting data: {str(e)}")
+
+
+@router.post("/telegram/{social_account_id}", response_model=CollectDataResponse)
+async def collect_telegram_data(
+    social_account_id: int, request: CollectDataRequest = CollectDataRequest()
+):
+    """
+    Собрать данные Telegram канала за указанный период
+
+    - Получает информацию о канале
+    - Получает посты за указанный период
+    - Получает детальную статистику постов
+    - Сохраняет снимок профиля
+    - Сохраняет посты и их метрики
+    """
+    # Проверяем существование аккаунта
+    social_account = await SocialAccount.filter(id=social_account_id).first()
+    if not social_account:
+        raise HTTPException(status_code=404, detail="Social account not found")
+
+    # Проверяем платформу
+    if social_account.platform != "telegram":
+        raise HTTPException(
+            status_code=400,
+            detail="This endpoint only supports Telegram accounts",
+        )
+
+    # Собираем данные
+    try:
+        result = await collect_telegram_channel_data(
+            social_account=social_account,
+            start_date=request.start_date,
+            end_date=request.end_date,
+        )
+
+        return CollectDataResponse(
+            success=True,
+            message=result["message"],
+            posts_collected=result["posts_collected"],
+            profile_updated=result["profile_updated"],
+            credits_remaining=None,  # TGStat не использует кредиты таким образом
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error collecting data: {str(e)}")

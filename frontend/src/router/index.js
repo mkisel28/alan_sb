@@ -30,6 +30,11 @@ const routes = [
     path: '/comparative-analytics',
     name: 'ComparativeAnalytics',
     component: () => import('@/views/ComparativeAnalyticsPage.vue')
+  },
+  {
+    path: '/telegram-analytics',
+    name: 'TelegramAnalytics',
+    component: () => import('@/views/TelegramAnalyticsPage.vue')
   }
 ]
 

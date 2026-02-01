@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     scrapecreators_api_key: str
     scrapecreators_api_url: str = "https://api.scrapecreators.com"
 
+    # TGStat API
+    tgstat_api_token: str
+
     class Config:
         env_file = ".env"
         case_sensitive = False

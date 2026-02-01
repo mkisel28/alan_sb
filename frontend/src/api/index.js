@@ -76,16 +76,34 @@ export default {
   },
 
   // Collect Data
-  async collectTikTokData(socialAccountId, maxVideos = 100) {
+  async collectTikTokData(socialAccountId, startDate = null, endDate = null) {
     const response = await apiClient.post(`/collect/tiktok/${socialAccountId}`, {
-      max_videos: maxVideos
+      start_date: startDate,
+      end_date: endDate
     })
     return response.data
   },
 
-  async collectYouTubeData(socialAccountId, maxVideos = 100) {
+  async collectYouTubeData(socialAccountId, startDate = null, endDate = null) {
     const response = await apiClient.post(`/collect/youtube/${socialAccountId}`, {
-      max_videos: maxVideos
+      start_date: startDate,
+      end_date: endDate
+    })
+    return response.data
+  },
+
+  async collectInstagramData(socialAccountId, startDate = null, endDate = null) {
+    const response = await apiClient.post(`/collect/instagram/${socialAccountId}`, {
+      start_date: startDate,
+      end_date: endDate
+    })
+    return response.data
+  },
+
+  async collectTelegramData(socialAccountId, startDate = null, endDate = null) {
+    const response = await apiClient.post(`/collect/telegram/${socialAccountId}`, {
+      start_date: startDate,
+      end_date: endDate
     })
     return response.data
   },
@@ -124,6 +142,73 @@ export default {
     if (customEnd) params.append('custom_end', customEnd)
     
     const response = await apiClient.get('/analytics/comparative/platforms', { params })
+    return response.data
+  },
+
+  // Telegram Analytics
+  async getTelegramChannelAnalytics(socialAccountId, currentStart, currentEnd, previousStart = null, previousEnd = null) {
+    const params = {
+      current_start: currentStart,
+      current_end: currentEnd
+    }
+    if (previousStart) params.previous_start = previousStart
+    if (previousEnd) params.previous_end = previousEnd
+    
+    const response = await apiClient.get(`/telegram-analytics/channel/${socialAccountId}`, { params })
+    return response.data
+  },
+
+  async getAuthorTelegramAnalytics(authorId, currentStart, currentEnd, previousStart = null, previousEnd = null) {
+    const params = {
+      current_start: currentStart,
+      current_end: currentEnd
+    }
+    if (previousStart) params.previous_start = previousStart
+    if (previousEnd) params.previous_end = previousEnd
+    
+    const response = await apiClient.get(`/telegram-analytics/authors/${authorId}`, { params })
+    return response.data
+  },
+
+  async exportTelegramExcel(socialAccountId, currentStart, currentEnd, previousStart = null, previousEnd = null) {
+    const params = {
+      current_start: currentStart,
+      current_end: currentEnd
+    }
+    if (previousStart) params.previous_start = previousStart
+    if (previousEnd) params.previous_end = previousEnd
+    
+    const response = await apiClient.get(`/telegram-reports/excel/${socialAccountId}`, {
+      params,
+      responseType: 'blob'
+    })
+    return response.data
+  },
+
+  async getAllAuthorsTelegramAnalytics(currentStart, currentEnd, previousStart = null, previousEnd = null) {
+    const params = {
+      current_start: currentStart,
+      current_end: currentEnd
+    }
+    if (previousStart) params.previous_start = previousStart
+    if (previousEnd) params.previous_end = previousEnd
+    
+    const response = await apiClient.get('/telegram-analytics/all-authors', { params })
+    return response.data
+  },
+
+  async exportAllAuthorsTelegramExcel(currentStart, currentEnd, previousStart = null, previousEnd = null) {
+    const params = {
+      current_start: currentStart,
+      current_end: currentEnd
+    }
+    if (previousStart) params.previous_start = previousStart
+    if (previousEnd) params.previous_end = previousEnd
+    
+    const response = await apiClient.get('/telegram-reports/excel/all-authors', {
+      params,
+      responseType: 'blob'
+    })
     return response.data
   }
 }

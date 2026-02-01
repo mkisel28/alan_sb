@@ -1,5 +1,5 @@
-from datetime import datetime
-from typing import Dict, Any
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional
 from pathlib import Path
 import httpx
 import aiofiles
@@ -41,24 +41,34 @@ class TikTokService:
             return response.json()
 
     async def collect_videos(
-        self, social_account: SocialAccount, max_videos: int = 100
+        self,
+        social_account: SocialAccount,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
     ) -> Dict[str, Any]:
         """
-        Собрать видео TikTok профиля и сохранить в БД
+        Собрать записи TikTok профиля за указанный период
 
         Args:
             social_account: Аккаунт социальной сети
-            max_videos: Максимальное количество видео для сбора
+            start_date: Дата начала периода (по умолчанию - 30 дней назад)
+            end_date: Дата окончания периода (по умолчанию - сегодня)
 
         Returns:
             Статистика сбора
         """
-        collected_videos = 0
+        # Устанавливаем дефолтные даты если не указаны
+        if end_date is None:
+            end_date = datetime.now()
+        if start_date is None:
+            start_date = end_date - timedelta(days=30)
+
+        collected_posts = 0
         max_cursor = None
         credits_remaining = None
         profile_updated = False
 
-        while collected_videos < max_videos:
+        while True:
             # Получаем данные из API
             data = await self.get_profile_videos(
                 user_id=social_account.platform_user_id, max_cursor=max_cursor
@@ -78,13 +88,33 @@ class TikTokService:
                 await self._save_profile_snapshot(social_account, aweme_list[0])
                 profile_updated = True
 
-            # Сохраняем видео
+            # Сохраняем записи
+            posts_in_batch = 0
             for aweme in aweme_list:
-                if collected_videos >= max_videos:
-                    break
+                # Получаем дату создания записи
+                create_time = aweme.get("create_time")
+                if create_time:
+                    post_date = datetime.fromtimestamp(create_time)
 
-                await self._save_video(social_account, aweme)
-                collected_videos += 1
+                    # Проверяем, входит ли запись в диапазон дат
+                    if post_date < start_date:
+                        # Достигли начальной даты - прекращаем сбор
+                        break
+
+                    if post_date <= end_date:
+                        await self._save_video(social_account, aweme)
+                        collected_posts += 1
+                        posts_in_batch += 1
+
+            # Если в батче не было постов в диапазоне, останавливаемся
+            if posts_in_batch == 0 and aweme_list:
+                # Проверяем последний пост
+                last_post = aweme_list[-1]
+                last_create_time = last_post.get("create_time")
+                if last_create_time:
+                    last_post_date = datetime.fromtimestamp(last_create_time)
+                    if last_post_date < start_date:
+                        break
 
             # Проверяем, есть ли еще данные
             has_more = data.get("has_more", 0)
@@ -96,7 +126,9 @@ class TikTokService:
                 break
 
         return {
-            "videos_collected": collected_videos,
+            "success": True,
+            "message": f"Собрано {collected_posts} записей за период с {start_date.strftime('%Y-%m-%d')} по {end_date.strftime('%Y-%m-%d')}",
+            "posts_collected": collected_posts,
             "profile_updated": profile_updated,
             "credits_remaining": credits_remaining,
         }

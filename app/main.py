@@ -6,6 +6,8 @@ from api.authors import router as authors_router
 from api.social_accounts import router as social_accounts_router
 from api.collect import router as collect_router
 from api.analytics import router as analytics_router
+from api.telegram_analytics import router as telegram_analytics_router
+from api.telegram_reports import router as telegram_reports_router
 from api.reports import router as reports_router
 
 
@@ -34,6 +36,8 @@ app.include_router(authors_router)
 app.include_router(social_accounts_router)
 app.include_router(collect_router)
 app.include_router(analytics_router)
+app.include_router(telegram_analytics_router)
+app.include_router(telegram_reports_router)
 app.include_router(reports_router)
 
 

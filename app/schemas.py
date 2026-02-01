@@ -92,14 +92,15 @@ class VideoResponse(BaseModel):
 
 
 # Collection schemas
-class CollectTikTokRequest(BaseModel):
-    max_videos: int | None = 100  
+class CollectDataRequest(BaseModel):
+    start_date: datetime | None = None
+    end_date: datetime | None = None
 
 
-class CollectTikTokResponse(BaseModel):
+class CollectDataResponse(BaseModel):
     success: bool
     message: str
-    videos_collected: int
+    posts_collected: int
     profile_updated: bool
     credits_remaining: int | None = None
 

@@ -301,7 +301,7 @@ const loading = ref(false)
 const exportingWord = ref(false)
 const exportingExcel = ref(false)
 const analyticsData = ref(null)
-const selectedPlatforms = ref(['tiktok', 'youtube', 'youtube_shorts'])
+const selectedPlatforms = ref(['tiktok', 'youtube', 'youtube_shorts', 'instagram'])
 const period = ref('30d')
 const includePrevious = ref(true)
 

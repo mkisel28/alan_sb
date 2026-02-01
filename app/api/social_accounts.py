@@ -37,7 +37,6 @@ async def create_social_account(social_account: SocialAccountCreate):
 
 @router.get("/authors/{author_id}", response_model=List[SocialAccountResponse])
 async def get_author_social_accounts(author_id: int):
-    """Получить все социальные сети автора"""
     author = await Author.filter(id=author_id).first()
     if not author:
         raise HTTPException(status_code=404, detail="Author not found")
@@ -65,7 +64,6 @@ async def update_social_account(account_id: int, account_data: SocialAccountUpda
     if not account:
         raise HTTPException(status_code=404, detail="Social account not found")
 
-    # Обновляем только переданные поля
     if account_data.username is not None:
         account.username = account_data.username
     if account_data.profile_url is not None:

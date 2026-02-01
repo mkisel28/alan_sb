@@ -3,7 +3,8 @@
 """
 
 import httpx
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Optional
 from models import SocialAccount, ProfileSnapshot, Video
 from config import settings
 
@@ -12,17 +13,30 @@ SCRAPECREATORS_BASE_URL = "https://api.scrapecreators.com/v1/youtube"
 
 
 async def collect_youtube_channel_data(
-    social_account: SocialAccount, max_videos: int = 100
+    social_account: SocialAccount,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
 ) -> dict:
     """
-    Собрать данные канала YouTube (обычные видео)
+    Собрать записи канала YouTube за указанный период
+
+    Args:
+        social_account: Аккаунт YouTube канала
+        start_date: Дата начала периода (по умолчанию - 30 дней назад)
+        end_date: Дата окончания периода (по умолчанию - сегодня)
     """
     if social_account.platform not in ["youtube", "youtube_shorts"]:
         raise ValueError("Social account must be YouTube or YouTube Shorts platform")
 
+    # Устанавливаем дефолтные даты если не указаны
+    if end_date is None:
+        end_date = datetime.now()
+    if start_date is None:
+        start_date = end_date - timedelta(days=30)
+
     channel_id = social_account.platform_user_id
     credits_used = 0
-    videos_collected = 0
+    posts_collected = 0
     profile_updated = False
 
     async with httpx.AsyncClient(timeout=60.0) as client:
@@ -46,38 +60,42 @@ async def collect_youtube_channel_data(
                 social_account.username = channel_data["name"]
                 await social_account.save()
 
-        # 2. Собираем видео в зависимости от типа платформы
+        # 2. Собираем записи в зависимости от типа платформы
         if social_account.platform == "youtube_shorts":
             # Собираем Shorts
-            videos_data = await _collect_shorts(client, channel_id, max_videos)
+            videos_data = await _collect_shorts(
+                client, channel_id, start_date, end_date
+            )
         else:
             # Собираем обычные видео
-            videos_data = await _collect_videos(client, channel_id, max_videos)
+            videos_data = await _collect_videos(
+                client, channel_id, start_date, end_date
+            )
 
         credits_used += len(videos_data) // 50 + 1  # Примерная оценка
 
-        # 3. Сохраняем видео
-        for video_data in videos_data[:max_videos]:
+        # 3. Сохраняем записи
+        for video_data in videos_data:
             await _save_youtube_video(social_account, video_data)
-            videos_collected += 1
+            posts_collected += 1
 
     return {
         "success": True,
-        "message": f"Collected {videos_collected} videos",
-        "videos_collected": videos_collected,
+        "message": f"Collected {posts_collected} posts from {start_date.date()} to {end_date.date()}",
+        "posts_collected": posts_collected,
         "profile_updated": profile_updated,
         "credits_remaining": channel_data.get("credits_remaining"),
     }
 
 
 async def _collect_videos(
-    client: httpx.AsyncClient, channel_id: str, max_videos: int
+    client: httpx.AsyncClient, channel_id: str, start_date: datetime, end_date: datetime
 ) -> list:
-    """Собрать обычные видео канала"""
+    """Собрать обычные видео канала за указанный период"""
     all_videos = []
     continuation_token = None
 
-    while len(all_videos) < max_videos:
+    while True:
         params = {
             "channelId": channel_id,
             "sort": "latest",
@@ -97,7 +115,27 @@ async def _collect_videos(
         if not data.get("success") or not data.get("videos"):
             break
 
-        all_videos.extend(data["videos"])
+        videos = data["videos"]
+
+        # Фильтруем и проверяем даты
+        for video in videos:
+            # Парсим дату публикации
+            publish_date_str = video.get("publishDate") or video.get("publishedTime")
+            try:
+                video_date = datetime.fromisoformat(
+                    publish_date_str.replace("Z", "+00:00")
+                )
+
+                # Проверяем диапазон дат
+                if video_date < start_date:
+                    # Достигли начальной даты - прекращаем сбор
+                    return all_videos
+
+                if video_date <= end_date:
+                    all_videos.append(video)
+            except (ValueError, AttributeError):
+                # Если не удалось распарсить дату, добавляем видео
+                all_videos.append(video)
 
         # Проверяем наличие continuationToken для пагинации
         continuation_token = data.get("continuationToken")
@@ -108,13 +146,13 @@ async def _collect_videos(
 
 
 async def _collect_shorts(
-    client: httpx.AsyncClient, channel_id: str, max_videos: int
+    client: httpx.AsyncClient, channel_id: str, start_date: datetime, end_date: datetime
 ) -> list:
-    """Собрать Shorts канала"""
+    """Собрать Shorts канала за указанный период"""
     all_shorts = []
     continuation_token = None
 
-    while len(all_shorts) < max_videos:
+    while True:
         params = {
             "channelId": channel_id,
             "sort": "newest",
@@ -133,7 +171,27 @@ async def _collect_shorts(
         if not data.get("success") or not data.get("shorts"):
             break
 
-        all_shorts.extend(data["shorts"])
+        shorts = data["shorts"]
+
+        # Фильтруем и проверяем даты
+        for short in shorts:
+            # Парсим дату публикации
+            publish_date_str = short.get("publishDate") or short.get("publishedTime")
+            try:
+                short_date = datetime.fromisoformat(
+                    publish_date_str.replace("Z", "+00:00")
+                )
+
+                # Проверяем диапазон дат
+                if short_date < start_date:
+                    # Достигли начальной даты - прекращаем сбор
+                    return all_shorts
+
+                if short_date <= end_date:
+                    all_shorts.append(short)
+            except (ValueError, AttributeError):
+                # Если не удалось распарсить дату, добавляем short
+                all_shorts.append(short)
 
         continuation_token = data.get("continuationToken")
         if not continuation_token:

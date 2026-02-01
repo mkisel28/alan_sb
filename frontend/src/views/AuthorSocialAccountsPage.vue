@@ -174,7 +174,8 @@
         <el-form-item label="Платформа">
           <el-select v-model="socialForm.platform" placeholder="Выберите платформу" class="w-full">
             <el-option label="TikTok" value="tiktok" />
-            <el-option label="Instagram" value="instagram" disabled />
+            <el-option label="Instagram" value="instagram" />
+            <el-option label="Telegram" value="telegram" />
             <el-option label="YouTube" value="youtube" />
             <el-option label="YouTube Shorts" value="youtube_shorts" />
           </el-select>
@@ -183,21 +184,45 @@
         <el-form-item label="User ID">
           <el-input
             v-model="socialForm.platform_user_id"
-            :placeholder="socialForm.platform === 'youtube' || socialForm.platform === 'youtube_shorts' ? 'UCxxxxxxxxxxxxxxxxxxxxxx (Channel ID)' : '6868974846787077121'"
+            :placeholder="
+              socialForm.platform === 'youtube' || socialForm.platform === 'youtube_shorts' 
+                ? 'UCxxxxxxxxxxxxxxxxxxxxxx (Channel ID)' 
+                : socialForm.platform === 'instagram'
+                ? 'ph_maxsel (username/handle)'
+                : socialForm.platform === 'telegram'
+                ? '@channelname или ID канала'
+                : '6868974846787077121'
+            "
           />
         </el-form-item>
 
         <el-form-item label="Username">
           <el-input
             v-model="socialForm.username"
-            :placeholder="socialForm.platform === 'youtube' || socialForm.platform === 'youtube_shorts' ? '@channelname или Channel Name' : 'ksenia_buglak'"
+            :placeholder="
+              socialForm.platform === 'youtube' || socialForm.platform === 'youtube_shorts' 
+                ? '@channelname или Channel Name' 
+                : socialForm.platform === 'instagram'
+                ? 'ph_maxsel'
+                : socialForm.platform === 'telegram'
+                ? '@channelname'
+                : 'ksenia_buglak'
+            "
           />
         </el-form-item>
 
         <el-form-item label="URL профиля">
           <el-input
             v-model="socialForm.profile_url"
-            :placeholder="socialForm.platform === 'youtube' || socialForm.platform === 'youtube_shorts' ? 'https://www.youtube.com/@channelname' : 'https://www.tiktok.com/@username'"
+            :placeholder="
+              socialForm.platform === 'youtube' || socialForm.platform === 'youtube_shorts' 
+                ? 'https://www.youtube.com/@channelname' 
+                : socialForm.platform === 'instagram'
+                ? 'https://www.instagram.com/ph_maxsel/'
+                : socialForm.platform === 'telegram'
+                ? 'https://t.me/channelname'
+                : 'https://www.tiktok.com/@username'
+            "
           />
         </el-form-item>
       </el-form>
@@ -360,9 +385,13 @@ const collectData = async (socialAccountId) => {
     // Определяем endpoint в зависимости от платформы
     let endpoint = null
     if (account.platform === 'tiktok') {
-      endpoint = api.collectTikTokData(socialAccountId, 100)
+      endpoint = api.collectTikTokData(socialAccountId, null, null)
     } else if (account.platform === 'youtube' || account.platform === 'youtube_shorts') {
-      endpoint = api.collectYouTubeData(socialAccountId, 100)
+      endpoint = api.collectYouTubeData(socialAccountId, null, null)
+    } else if (account.platform === 'instagram') {
+      endpoint = api.collectInstagramData(socialAccountId, null, null)
+    } else if (account.platform === 'telegram') {
+      endpoint = api.collectTelegramData(socialAccountId, null, null)
     } else {
       ElMessage.warning(`Сбор данных для ${account.platform} пока не поддерживается`)
       return

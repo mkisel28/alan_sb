@@ -30,6 +30,11 @@
             <span>Авторы</span>
           </el-menu-item>
 
+          <el-menu-item index="/telegram-analytics">
+            <el-icon><ChatDotRound /></el-icon>
+            <span>Telegram Аналитика</span>
+          </el-menu-item>
+
           <el-menu-item index="/analytics">
             <el-icon><DataAnalysis /></el-icon>
             <span>Аналитика</span>
