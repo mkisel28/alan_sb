@@ -225,14 +225,8 @@ async def _save_instagram_post(social_account: SocialAccount, post_data: dict) -
     """Сохранить или обновить пост (видео/фото)"""
     post_id = post_data.get("id") or post_data.get("strong_id__")
 
-    # Парсим дату публикации (используем device_timestamp в миллисекундах)
-    device_timestamp = post_data.get("device_timestamp")
+    device_timestamp = post_data.get("taken_at")
     if device_timestamp:
-        # device_timestamp может быть в микросекундах (нужно разделить на 1000000)
-        if device_timestamp > 10000000000000:  # Если больше, значит микросекунды
-            timestamp_seconds = device_timestamp / 1000000
-        else:
-            timestamp_seconds = device_timestamp / 1000
         created_at_platform = datetime.fromtimestamp(timestamp_seconds, tz=timezone.utc)
     else:
         created_at_platform = datetime.now(timezone.utc)
