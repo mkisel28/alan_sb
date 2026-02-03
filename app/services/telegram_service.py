@@ -5,7 +5,7 @@
 import httpx
 import aiofiles
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from models import SocialAccount, ProfileSnapshot, Video
 from config import settings
@@ -43,11 +43,20 @@ async def collect_telegram_channel_data(
 
     # Устанавливаем дефолтные даты если не указаны
     if end_date is None:
-        end_date = datetime.now()
+        end_date = datetime.now(timezone.utc)
+    else:
+        # Если дата передана без timezone, делаем её UTC-aware
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
+
     if start_date is None:
         from datetime import timedelta
 
         start_date = end_date - timedelta(days=30)
+    else:
+        # Если дата передана без timezone, делаем её UTC-aware
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
 
     posts_collected = 0
     profile_updated = False
@@ -267,7 +276,7 @@ async def _save_channel_snapshot(
         # Сохраняем аватар локально
         channel_id = social_account.platform_user_id
         avatar_dir = MEDIA_ROOT / "telegram" / channel_id / "avatars"
-        timestamp = int(datetime.now().timestamp())
+        timestamp = int(datetime.now(timezone.utc).timestamp())
         avatar_filename = f"{timestamp}.jpg"
         avatar_path = avatar_dir / avatar_filename
 
@@ -280,7 +289,7 @@ async def _save_channel_snapshot(
 
     snapshot = await ProfileSnapshot.create(
         social_account=social_account,
-        snapshot_date=datetime.now(),
+        snapshot_date=datetime.now(timezone.utc),
         followers_count=channel_stats.get("participants_count", 0),
         following_count=0,  # Telegram не показывает подписки
         total_likes=0,  # В Telegram нет лайков, есть реакции
@@ -320,7 +329,9 @@ async def _save_telegram_post(social_account: SocialAccount, post_data: dict) ->
     # Парсим дату публикации (timestamp)
     post_date = post_data.get("date")
     created_at_platform = (
-        datetime.fromtimestamp(post_date) if post_date else datetime.now()
+        datetime.fromtimestamp(post_date, tz=timezone.utc)
+        if post_date
+        else datetime.now(timezone.utc)
     )
 
     # Получаем статистику из детальных данных если есть
@@ -387,7 +398,7 @@ async def _save_telegram_post(social_account: SocialAccount, post_data: dict) ->
         "comments_count": detailed_stats.get("commentsCount", 0),
         "shares_count": detailed_stats.get("sharesCount", 0),
         "saves_count": 0,  # Telegram API не предоставляет сохранения
-        "last_updated": datetime.now(),
+        "last_updated": datetime.now(timezone.utc),
         "extra_data": {
             "is_deleted": post_data.get("is_deleted", 0),
             "forwarded_from": post_data.get("forwarded_from"),

@@ -5,7 +5,7 @@
 import httpx
 import aiofiles
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from models import SocialAccount, ProfileSnapshot, Video
 from config import settings
@@ -58,9 +58,18 @@ async def collect_instagram_profile_data(
 
     # Устанавливаем значения по умолчанию для дат
     if end_date is None:
-        end_date = datetime.now()
+        end_date = datetime.now(timezone.utc)
+    else:
+        # Если дата передана без timezone, делаем её UTC-aware
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
+
     if start_date is None:
         start_date = end_date - timedelta(days=30)
+    else:
+        # Если дата передана без timezone, делаем её UTC-aware
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
 
     handle = social_account.platform_user_id
     credits_used = 0
@@ -138,7 +147,9 @@ async def _collect_posts(
             device_timestamp = item.get("device_timestamp")
             if device_timestamp:
                 try:
-                    post_date = datetime.fromtimestamp(device_timestamp)
+                    post_date = datetime.fromtimestamp(
+                        device_timestamp, tz=timezone.utc
+                    )
 
                     # Проверяем диапазон дат
                     if post_date < start_date:
@@ -178,7 +189,7 @@ async def _save_profile_snapshot(
         # Сохраняем аватар локально
         user_id = social_account.platform_user_id
         avatar_dir = MEDIA_ROOT / "instagram" / user_id / "avatars"
-        timestamp = int(datetime.now().timestamp())
+        timestamp = int(datetime.now(timezone.utc).timestamp())
         avatar_filename = f"{timestamp}.jpg"
         avatar_path = avatar_dir / avatar_filename
 
@@ -191,7 +202,7 @@ async def _save_profile_snapshot(
 
     snapshot = await ProfileSnapshot.create(
         social_account=social_account,
-        snapshot_date=datetime.now(),
+        snapshot_date=datetime.now(timezone.utc),
         followers_count=followers_count,
         following_count=following_count,
         total_likes=0,  # Instagram API не предоставляет общее количество лайков
@@ -222,9 +233,9 @@ async def _save_instagram_post(social_account: SocialAccount, post_data: dict) -
             timestamp_seconds = device_timestamp / 1000000
         else:
             timestamp_seconds = device_timestamp / 1000
-        created_at_platform = datetime.fromtimestamp(timestamp_seconds)
+        created_at_platform = datetime.fromtimestamp(timestamp_seconds, tz=timezone.utc)
     else:
-        created_at_platform = datetime.now()
+        created_at_platform = datetime.now(timezone.utc)
 
     # Получаем URL поста
     post_url = (
@@ -296,7 +307,7 @@ async def _save_instagram_post(social_account: SocialAccount, post_data: dict) -
         "comments_count": comments_count,
         "shares_count": 0,  # Instagram API не предоставляет количество репостов
         "saves_count": 0,  # Instagram API не предоставляет количество сохранений
-        "last_updated": datetime.now(),
+        "last_updated": datetime.now(timezone.utc),
         "extra_data": {
             "has_audio": post_data.get("has_audio", False),
             "is_unified_video": post_data.get("is_unified_video", False),

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 from pathlib import Path
 import httpx
@@ -60,9 +60,18 @@ class TikTokService:
         print(end_date)
         # Устанавливаем дефолтные даты если не указаны
         if end_date is None:
-            end_date = datetime.now()
+            end_date = datetime.now(timezone.utc)
+        else:
+            # Если дата передана без timezone, делаем её UTC-aware
+            if end_date.tzinfo is None:
+                end_date = end_date.replace(tzinfo=timezone.utc)
+
         if start_date is None:
             start_date = end_date - timedelta(days=30)
+        else:
+            # Если дата передана без timezone, делаем её UTC-aware
+            if start_date.tzinfo is None:
+                start_date = start_date.replace(tzinfo=timezone.utc)
 
         collected_posts = 0
         max_cursor = None
@@ -95,7 +104,7 @@ class TikTokService:
                 # Получаем дату создания записи
                 create_time = aweme.get("create_time")
                 if create_time:
-                    post_date = datetime.fromtimestamp(create_time)
+                    post_date = datetime.fromtimestamp(create_time, tz=timezone.utc)
 
                     # Проверяем, входит ли запись в диапазон дат
                     if post_date < start_date:
@@ -113,7 +122,9 @@ class TikTokService:
                 last_post = aweme_list[-1]
                 last_create_time = last_post.get("create_time")
                 if last_create_time:
-                    last_post_date = datetime.fromtimestamp(last_create_time)
+                    last_post_date = datetime.fromtimestamp(
+                        last_create_time, tz=timezone.utc
+                    )
                     if last_post_date < start_date:
                         break
 
@@ -196,7 +207,7 @@ class TikTokService:
                     / social_account.platform_user_id
                     / "avatars"
                 )
-                timestamp = int(datetime.now().timestamp())
+                timestamp = int(datetime.now(timezone.utc).timestamp())
                 avatar_filename = f"{timestamp}.jpg"
                 avatar_path = user_dir / avatar_filename
 
@@ -283,9 +294,9 @@ class TikTokService:
         # Получаем дату создания
         create_time = aweme.get("create_time")
         if create_time:
-            created_at_platform = datetime.fromtimestamp(create_time)
+            created_at_platform = datetime.fromtimestamp(create_time, tz=timezone.utc)
         else:
-            created_at_platform = datetime.now()
+            created_at_platform = datetime.now(timezone.utc)
 
         # Используем get_or_create для избежания конфликтов
         video, created = await Video.get_or_create(

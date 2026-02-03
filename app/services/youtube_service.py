@@ -3,7 +3,7 @@
 """
 
 import httpx
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from models import SocialAccount, ProfileSnapshot, Video
 from config import settings
@@ -30,9 +30,18 @@ async def collect_youtube_channel_data(
 
     # Устанавливаем дефолтные даты если не указаны
     if end_date is None:
-        end_date = datetime.now()
+        end_date = datetime.now(timezone.utc)
+    else:
+        # Если дата передана без timezone, делаем её UTC-aware
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
+
     if start_date is None:
         start_date = end_date - timedelta(days=30)
+    else:
+        # Если дата передана без timezone, делаем её UTC-aware
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
 
     channel_id = social_account.platform_user_id
     credits_used = 0
@@ -212,7 +221,7 @@ async def _save_channel_snapshot(
 
     snapshot = await ProfileSnapshot.create(
         social_account=social_account,
-        snapshot_date=datetime.now(),
+        snapshot_date=datetime.now(timezone.utc),
         followers_count=channel_data.get("subscriberCount", 0),
         following_count=0,  # YouTube не показывает подписки канала
         total_likes=0,  # YouTube API не предоставляет общее количество лайков
@@ -234,7 +243,7 @@ async def _save_youtube_video(social_account: SocialAccount, video_data: dict) -
             publish_date_str.replace("Z", "+00:00")
         )
     except (ValueError, AttributeError):
-        created_at_platform = datetime.now()
+        created_at_platform = datetime.now(timezone.utc)
 
     # Проверяем существование видео
     existing_video = await Video.filter(
@@ -259,7 +268,7 @@ async def _save_youtube_video(social_account: SocialAccount, video_data: dict) -
         "comments_count": video_data.get("commentCountInt", 0),
         "shares_count": 0,  # YouTube API не предоставляет количество репостов
         "saves_count": 0,  # YouTube API не предоставляет количество сохранений
-        "last_updated": datetime.now(),
+        "last_updated": datetime.now(timezone.utc),
     }
 
     if existing_video:
