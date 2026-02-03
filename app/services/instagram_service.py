@@ -227,7 +227,7 @@ async def _save_instagram_post(social_account: SocialAccount, post_data: dict) -
 
     device_timestamp = post_data.get("taken_at")
     if device_timestamp:
-        created_at_platform = datetime.fromtimestamp(timestamp_seconds, tz=timezone.utc)
+        created_at_platform = datetime.fromtimestamp(device_timestamp, tz=timezone.utc)
     else:
         created_at_platform = datetime.now(timezone.utc)
 
